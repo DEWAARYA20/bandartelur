@@ -76,29 +76,42 @@ export default function DashboardPage() {
 
   // --- Calculations ---
 
+  const PROFIT_PER_RACK = 5000
+  const EGGS_PER_RACK = 30
+
   const currentMonthStats = useMemo(() => {
     const now = new Date()
     const month = now.getMonth()
     const year = now.getFullYear()
 
-    const egg = eggSales
-      .filter(s => { const d = new Date(s.date); return d.getMonth() === month && d.getFullYear() === year })
-      .reduce((sum, s) => sum + s.totalPrice, 0)
+    const eggSalesThisMonth = eggSales.filter(s => {
+      const d = new Date(s.date); return d.getMonth() === month && d.getFullYear() === year
+    })
+    const martabakSalesThisMonth = martabakSales.filter(s => {
+      const d = new Date(s.date); return d.getMonth() === month && d.getFullYear() === year
+    })
 
-    const martabak = martabakSales
-      .filter(s => { const d = new Date(s.date); return d.getMonth() === month && d.getFullYear() === year })
-      .reduce((sum, s) => sum + s.totalPrice, 0)
+    // Omset kotor
+    const eggRevenue = eggSalesThisMonth.reduce((sum, s) => sum + s.totalPrice, 0)
+    const martabakRevenue = martabakSalesThisMonth.reduce((sum, s) => sum + s.totalPrice, 0)
+    const revenue = eggRevenue + martabakRevenue
 
-    const cost = ingredients
-      .filter(i => { const d = new Date(i.date); return d.getMonth() === month && d.getFullYear() === year })
-      .reduce((sum, i) => sum + i.cost, 0)
+    // Keuntungan telur: jumlah rak × Rp 5.000
+    const eggProfit = eggSalesThisMonth.reduce((sum, s) => {
+      const racks = Math.floor(s.quantity / EGGS_PER_RACK)
+      return sum + (racks * PROFIT_PER_RACK)
+    }, 0)
 
+    // Pengeluaran operasional
     const operational = expenses
       .filter(e => { const d = new Date(e.date); return d.getMonth() === month && d.getFullYear() === year })
       .reduce((sum, e) => sum + e.amount, 0)
 
-    const totalCost = cost + operational
-    return { revenue: egg + martabak, cost: totalCost, profit: (egg + martabak) - totalCost, operational }
+    // Net profit = (keuntungan telur per rak + revenue martabak) - pengeluaran
+    const totalProfit = eggProfit + martabakRevenue
+    const netProfit = totalProfit - operational
+
+    return { revenue, eggRevenue, martabakRevenue, eggProfit, operational, totalProfit, profit: netProfit, cost: operational }
   }, [eggSales, martabakSales, ingredients, expenses])
 
   // Chart Data (Last 7 Days)

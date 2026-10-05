@@ -169,17 +169,55 @@ export default function FinancialPage() {
       .reduce((sum, e) => sum + e.amount, 0)
   }, [expenses, startDate, endDate])
 
+  // ============================================================
+  // NET PROFIT BARU:
+  // Keuntungan Telur  = jumlah_rak_terjual × Rp 5.000
+  //                     (1 rak = 30 butir)
+  // Keuntungan Martabak = total revenue martabak (full)
+  // Net Profit = Keuntungan Telur + Revenue Martabak - Pengeluaran Operasional
+  // ============================================================
+  const PROFIT_PER_RACK = 5000
+  const EGGS_PER_RACK = 30
+
   const stats = useMemo(() => {
-    let income = 0; let expense = 0
+    let grossIncome = 0   // omset kotor (telur + martabak)
+    let eggGross = 0      // omset kotor telur
+    let martabakRevenue = 0 // revenue martabak = langsung keuntungan
+    let eggProfit = 0     // keuntungan bersih dari telur (rak × 5000)
+    let expense = 0       // bahan baku
+
+    // Hitung dari filtered transactions
     filteredTransactions.forEach(t => {
-      if (t.type === "income") income += t.amount
-      else expense += t.amount
+      if (t.type === "income" && t.category === "telur") {
+        eggGross += t.amount
+        grossIncome += t.amount
+      }
+      if (t.type === "income" && t.category === "martabak") {
+        martabakRevenue += t.amount
+        grossIncome += t.amount
+      }
+      if (t.type === "expense") expense += t.amount
     })
-    const profit = income - expense
-    const netProfit = profit - totalOperational // Net Profit
-    const margin = income > 0 ? (netProfit / income) * 100 : 0
-    return { income, expense, profit, netProfit, margin }
-  }, [filteredTransactions, totalOperational])
+
+    // Hitung keuntungan telur dari jumlah rak yang terjual dalam periode filter
+    if (startDate && endDate) {
+      const start = new Date(startDate); start.setHours(0, 0, 0, 0)
+      const end = new Date(endDate); end.setHours(23, 59, 59, 999)
+      eggSales.forEach(s => {
+        const d = new Date(s.date)
+        if (d >= start && d <= end) {
+          const racks = Math.floor(s.quantity / EGGS_PER_RACK)
+          eggProfit += racks * PROFIT_PER_RACK
+        }
+      })
+    }
+
+    const totalProfit = eggProfit + martabakRevenue   // keuntungan kotor sebelum pengeluaran
+    const netProfit = totalProfit - totalOperational  // net bersih
+    const income = grossIncome                         // total pemasukan (omset)
+    const margin = grossIncome > 0 ? (netProfit / grossIncome) * 100 : 0
+    return { income, expense, eggGross, eggProfit, martabakRevenue, totalProfit, netProfit, margin }
+  }, [filteredTransactions, totalOperational, eggSales, startDate, endDate])
 
   const chartData = useMemo(() => {
     const dailyMap = new Map<string, { date: string, income: number, expense: number }>()
@@ -295,36 +333,37 @@ export default function FinancialPage() {
                   <CardContent className="p-6">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Total Pemasukan</p>
+                        <p className="text-sm font-medium text-muted-foreground">Omset Kotor</p>
                         <h3 className="text-2xl font-bold mt-2 text-blue-700">Rp {stats.income.toLocaleString("id-ID")}</h3>
+                        <p className="text-xs text-gray-500 mt-1">Telur + Martabak</p>
                       </div>
                       <div className="p-2 bg-blue-50 rounded-lg"><ArrowUpRight className="h-5 w-5 text-blue-600" /></div>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="shadow-sm hover:shadow-md transition-all border-l-4 border-l-red-500">
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Total Pengeluaran</p>
-                        <h3 className="text-2xl font-bold mt-2 text-red-700">Rp {stats.expense.toLocaleString("id-ID")}</h3>
-                      </div>
-                      <div className="p-2 bg-red-50 rounded-lg"><ArrowDownRight className="h-5 w-5 text-red-600" /></div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-
-
                 <Card className="shadow-sm hover:shadow-md transition-all border-l-4 border-l-orange-500">
                   <CardContent className="p-6">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Biaya Operasional</p>
+                        <p className="text-sm font-medium text-muted-foreground">Total Pengeluaran</p>
                         <h3 className="text-2xl font-bold mt-2 text-orange-700">Rp {totalOperational.toLocaleString("id-ID")}</h3>
+                        <p className="text-xs text-gray-500 mt-1">Biaya Operasional</p>
                       </div>
-                      <div className="p-2 bg-orange-50 rounded-lg"><Wallet className="h-5 w-5 text-orange-600" /></div>
+                      <div className="p-2 bg-orange-50 rounded-lg"><ArrowDownRight className="h-5 w-5 text-orange-600" /></div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-sm hover:shadow-md transition-all border-l-4 border-l-yellow-500">
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Keuntungan Kotor</p>
+                        <h3 className="text-2xl font-bold mt-2 text-yellow-700">Rp {stats.totalProfit.toLocaleString("id-ID")}</h3>
+                        <p className="text-xs text-gray-500 mt-1">Telur Rp {stats.eggProfit.toLocaleString("id-ID")} + Martabak Rp {stats.martabakRevenue.toLocaleString("id-ID")}</p>
+                      </div>
+                      <div className="p-2 bg-yellow-50 rounded-lg"><TrendingUp className="h-5 w-5 text-yellow-600" /></div>
                     </div>
                   </CardContent>
                 </Card>
@@ -337,22 +376,11 @@ export default function FinancialPage() {
                         <h3 className={`text-2xl font-bold mt-2 ${stats.netProfit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                           Rp {stats.netProfit.toLocaleString("id-ID")}
                         </h3>
+                        <p className="text-xs text-gray-500 mt-1">Margin {stats.margin.toFixed(1)}%</p>
                       </div>
                       <div className={`p-2 rounded-lg ${stats.netProfit >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
                         <Wallet className={`h-5 w-5 ${stats.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`} />
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-sm hover:shadow-md transition-all border-l-4 border-l-purple-500">
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Net Margin</p>
-                        <h3 className="text-2xl font-bold mt-2 text-purple-700">{stats.margin.toFixed(1)}%</h3>
-                      </div>
-                      <div className="p-2 bg-purple-50 rounded-lg"><TrendingUp className="h-5 w-5 text-purple-600" /></div>
                     </div>
                   </CardContent>
                 </Card>
