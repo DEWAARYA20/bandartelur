@@ -1,7 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ftmrpysfshftbhrpbqdq.supabase.co"
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_yvAuBHe9IweO1ylryPNucA_zacZAeNL"
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://vcxzxlokpntvnwjujjxq.supabase.co"
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_3tpxnuHveNxYA_CWAW30XQ_HzEot98_"
 
 // Create Supabase client with optimized settings
 export const supabase = supabaseUrl && supabaseKey
