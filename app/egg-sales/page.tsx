@@ -43,21 +43,33 @@ export default function EggSalesPage() {
   })
 
   // Forms
-  const [stokForm, setStokForm] = useState({
-    size: "besar" as "kecil" | "sedang" | "besar",
-    rackCount: 1,
-    pricePerEgg: 2000,
+  const [stokForm, setStokForm] = useState<{
+    size: "kecil" | "sedang" | "besar";
+    rackCount: number | string;
+    pricePerEgg: number | string;
+  }>({
+    size: "besar",
+    rackCount: "",
+    pricePerEgg: "",
   })
 
-  const [salesForm, setSalesForm] = useState({
-    size: "besar" as "kecil" | "sedang" | "besar",
-    quantity: 0,
-    pricePerEgg: 2000,
+  const [salesForm, setSalesForm] = useState<{
+    size: "kecil" | "sedang" | "besar";
+    quantity: number | string;
+    pricePerEgg: number | string;
+  }>({
+    size: "besar",
+    quantity: "",
+    pricePerEgg: "",
   })
 
-  const [wasteForm, setWasteForm] = useState({
-    size: "besar" as "kecil" | "sedang" | "besar",
-    quantity: 0,
+  const [wasteForm, setWasteForm] = useState<{
+    size: "kecil" | "sedang" | "besar";
+    quantity: number | string;
+    reason: string;
+  }>({
+    size: "besar",
+    quantity: "",
     reason: "pecah"
   })
 
@@ -133,7 +145,9 @@ export default function EggSalesPage() {
   const handleSubmitStok = async () => {
     try {
       console.log("Submitting stok...", stokForm)
-      if (stokForm.rackCount <= 0 || stokForm.pricePerEgg <= 0) {
+      const rackCount = Number(stokForm.rackCount) || 0
+      const pricePerEgg = Number(stokForm.pricePerEgg) || 0
+      if (rackCount <= 0 || pricePerEgg <= 0) {
         toast({ title: "Validasi Gagal", description: "Isi data dengan benar", variant: "destructive" })
         return
       }
@@ -145,10 +159,10 @@ export default function EggSalesPage() {
       const payload = {
         userId: user.id,
         size: stokForm.size,
-        rackCount: stokForm.rackCount,
-        eggsPerRack: 35,
-        pricePerEgg: stokForm.pricePerEgg,
-        totalEggs: stokForm.rackCount * 35,
+        rackCount: rackCount,
+        eggsPerRack: 30,
+        pricePerEgg: pricePerEgg,
+        totalEggs: rackCount * 30,
         date: getCurrentDateTimeWITA(),
         cabangId: user.cabangId
       }
@@ -164,7 +178,7 @@ export default function EggSalesPage() {
       if (success) {
         console.log("Success!")
         toast({ title: "Berhasil", description: "Data stok tersimpan" })
-        setStokForm({ size: "besar", rackCount: 1, pricePerEgg: 2000 })
+        setStokForm({ size: "besar", rackCount: "", pricePerEgg: "" })
         setShowAddStok(false)
         setEditingStokId(null)
         loadData()
@@ -199,7 +213,9 @@ export default function EggSalesPage() {
   // --- Handlers Sales ---
 
   const handleSubmitSales = async () => {
-    if (salesForm.quantity <= 0 || salesForm.pricePerEgg <= 0) {
+    const qty = Number(salesForm.quantity) || 0
+    const price = Number(salesForm.pricePerEgg) || 0
+    if (qty <= 0 || price <= 0) {
       toast({ title: "Validasi Gagal", description: "Isi data dengan benar", variant: "destructive" })
       return
     }
@@ -208,9 +224,9 @@ export default function EggSalesPage() {
     const payload = {
       userId: user.id,
       size: salesForm.size,
-      quantity: salesForm.quantity,
-      pricePerEgg: salesForm.pricePerEgg,
-      totalPrice: salesForm.quantity * salesForm.pricePerEgg,
+      quantity: qty,
+      pricePerEgg: price,
+      totalPrice: qty * price,
       date: new Date().toISOString(),
       cabangId: user.cabangId
     }
@@ -224,7 +240,7 @@ export default function EggSalesPage() {
 
     if (success) {
       toast({ title: "Berhasil", description: "Data penjualan tersimpan" })
-      setSalesForm({ size: "besar", quantity: 0, pricePerEgg: 2000 })
+      setSalesForm({ size: "besar", quantity: "", pricePerEgg: "" })
       setShowAddSales(false)
       setEditingSaleId(null)
       loadData()
@@ -254,7 +270,8 @@ export default function EggSalesPage() {
   // --- Handlers Waste ---
 
   const handleSubmitWaste = async () => {
-    if (wasteForm.quantity <= 0) {
+    const qty = Number(wasteForm.quantity) || 0
+    if (qty <= 0) {
       toast({ title: "Validasi Gagal", description: "Jumlah harus > 0", variant: "destructive" })
       return
     }
@@ -264,13 +281,13 @@ export default function EggSalesPage() {
       cabangId: user.cabangId,
       date: getCurrentDateTimeWITA(),
       size: wasteForm.size,
-      quantity: wasteForm.quantity,
+      quantity: qty,
       reason: wasteForm.reason
     }
 
     await addEggWaste(payload)
     toast({ title: "Berhasil", description: "Laporan stok rusak tersimpan" })
-    setWasteForm({ size: 'besar', quantity: 0, reason: 'pecah' })
+    setWasteForm({ size: 'besar', quantity: '', reason: 'pecah' })
     setShowAddWaste(false)
     loadData()
   }
@@ -468,7 +485,7 @@ export default function EggSalesPage() {
                     <CardTitle>Riwayat Stok Masuk</CardTitle>
                     <CardDescription>Pencatatan telur yang masuk dari supplier</CardDescription>
                   </div>
-                  <Button onClick={() => { setShowAddStok(true); setEditingStokId(null); setStokForm({ size: 'besar', rackCount: 1, pricePerEgg: 2000 }) }} className="w-full sm:w-auto">
+                  <Button onClick={() => { setShowAddStok(true); setEditingStokId(null); setStokForm({ size: 'besar', rackCount: '', pricePerEgg: '' }) }} className="w-full sm:w-auto">
                     <Plus className="w-4 h-4 mr-2" /> Tambah Stok
                   </Button>
                 </CardHeader>
@@ -490,12 +507,12 @@ export default function EggSalesPage() {
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Jumlah Rak</label>
-                          <input type="number" className="w-full p-2 border rounded-md" value={stokForm.rackCount} onChange={e => setStokForm({ ...stokForm, rackCount: Number(e.target.value) })} />
-                          <p className="text-xs text-gray-500">Estimasi: {stokForm.rackCount * 35} butir</p>
+                          <input type="number" placeholder="0" className="w-full p-2 border rounded-md" value={stokForm.rackCount} onChange={e => setStokForm({ ...stokForm, rackCount: e.target.value })} />
+                          <p className="text-xs text-gray-500">Estimasi: {(Number(stokForm.rackCount) || 0) * 30} butir</p>
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Harga Beli/Butir</label>
-                          <input type="number" className="w-full p-2 border rounded-md" value={stokForm.pricePerEgg} onChange={e => setStokForm({ ...stokForm, pricePerEgg: Number(e.target.value) })} />
+                          <input type="number" placeholder="0" className="w-full p-2 border rounded-md" value={stokForm.pricePerEgg} onChange={e => setStokForm({ ...stokForm, pricePerEgg: e.target.value })} />
                         </div>
                       </div>
                       <Button onClick={handleSubmitStok} className="w-full mt-4">Simpan Data</Button>
@@ -560,7 +577,7 @@ export default function EggSalesPage() {
                     <CardTitle>Riwayat Transaksi</CardTitle>
                     <CardDescription>Catatan penjualan harian</CardDescription>
                   </div>
-                  <Button onClick={() => { setShowAddSales(true); setEditingSaleId(null); setSalesForm({ size: 'besar', quantity: 0, pricePerEgg: 2000 }) }} className="w-full sm:w-auto">
+                  <Button onClick={() => { setShowAddSales(true); setEditingSaleId(null); setSalesForm({ size: 'besar', quantity: '', pricePerEgg: '' }) }} className="w-full sm:w-auto">
                     <Plus className="w-4 h-4 mr-2" /> Input Penjualan
                   </Button>
                 </CardHeader>
@@ -582,16 +599,16 @@ export default function EggSalesPage() {
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Jumlah (Butir)</label>
-                          <input type="number" className="w-full p-2 border rounded-md" value={salesForm.quantity} onChange={e => setSalesForm({ ...salesForm, quantity: Number(e.target.value) })} />
+                          <input type="number" placeholder="0" className="w-full p-2 border rounded-md" value={salesForm.quantity} onChange={e => setSalesForm({ ...salesForm, quantity: e.target.value })} />
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Harga Jual/Butir</label>
-                          <input type="number" className="w-full p-2 border rounded-md" value={salesForm.pricePerEgg} onChange={e => setSalesForm({ ...salesForm, pricePerEgg: Number(e.target.value) })} />
+                          <input type="number" placeholder="0" className="w-full p-2 border rounded-md" value={salesForm.pricePerEgg} onChange={e => setSalesForm({ ...salesForm, pricePerEgg: e.target.value })} />
                         </div>
                       </div>
                       <div className="mt-4 flex justify-between items-center bg-white p-3 rounded-lg border">
                         <span className="text-sm text-gray-500">Total Transaksi</span>
-                        <span className="font-bold text-lg text-green-600">Rp {(salesForm.quantity * salesForm.pricePerEgg).toLocaleString('id-ID')}</span>
+                        <span className="font-bold text-lg text-green-600">Rp {((Number(salesForm.quantity) || 0) * (Number(salesForm.pricePerEgg) || 0)).toLocaleString('id-ID')}</span>
                       </div>
                       <Button onClick={handleSubmitSales} className="w-full mt-4">Simpan Transaksi</Button>
                     </div>
@@ -656,7 +673,7 @@ export default function EggSalesPage() {
                     <CardTitle className="text-red-700">Laporan Stok Rusak</CardTitle>
                     <CardDescription>Pecah, busuk, atau hilang</CardDescription>
                   </div>
-                  <Button variant="destructive" onClick={() => setShowAddWaste(true)} className="w-full sm:w-auto">
+                  <Button variant="destructive" onClick={() => { setShowAddWaste(true); setWasteForm({ size: 'besar', quantity: '', reason: 'pecah' }) }} className="w-full sm:w-auto">
                     <AlertTriangle className="w-4 h-4 mr-2" /> Lapor Kerusakan
                   </Button>
                 </CardHeader>
@@ -678,7 +695,7 @@ export default function EggSalesPage() {
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Jumlah (Butir)</label>
-                          <input type="number" className="w-full p-2 border rounded-md" value={wasteForm.quantity} onChange={e => setWasteForm({ ...wasteForm, quantity: Number(e.target.value) })} />
+                          <input type="number" placeholder="0" className="w-full p-2 border rounded-md" value={wasteForm.quantity} onChange={e => setWasteForm({ ...wasteForm, quantity: e.target.value })} />
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Alasan</label>

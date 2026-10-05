@@ -60,11 +60,17 @@ export default function MartabakPage() {
 
   const [showAddIngredient, setShowAddIngredient] = useState(false)
   const [editingIngredientId, setEditingIngredientId] = useState<string | null>(null)
-  const [ingredientForm, setIngredientForm] = useState({
+  const [ingredientForm, setIngredientForm] = useState<{
+    name: string;
+    quantity: number | string;
+    unit: string;
+    cost: number | string;
+    cabangId: string;
+  }>({
     name: "",
-    quantity: 0,
+    quantity: "",
     unit: "kg",
-    cost: 0,
+    cost: "",
     cabangId: "", // Add cabangId to form state
   })
 
@@ -224,12 +230,20 @@ export default function MartabakPage() {
     }
     if (!user) return
 
+    const qty = Number(ingredientForm.quantity) || 0
+    const cost = Number(ingredientForm.cost) || 0
+
+    if (!ingredientForm.name || qty <= 0 || cost <= 0) {
+      toast({ title: "Validasi Gagal", description: "Isi nama bahan, jumlah, dan biaya dengan benar", variant: "destructive" })
+      return
+    }
+
     const payload = {
       userId: user.id,
       name: ingredientForm.name,
-      quantity: ingredientForm.quantity,
+      quantity: qty,
       unit: ingredientForm.unit,
-      cost: ingredientForm.cost,
+      cost: cost,
       date: getCurrentDateTimeWITA(),
       cabangId: targetCabang
     }
@@ -245,7 +259,7 @@ export default function MartabakPage() {
       toast({ title: "Berhasil", description: "Belanja bahan tersimpan" })
       setShowAddIngredient(false)
       setEditingIngredientId(null)
-      setIngredientForm({ name: "", quantity: 0, unit: "kg", cost: 0, cabangId: "" })
+      setIngredientForm({ name: "", quantity: "", unit: "kg", cost: "", cabangId: "" })
       loadData()
     } else {
       toast({ title: "Gagal", description: "Gagal menyimpan data", variant: "destructive" })
@@ -471,12 +485,17 @@ export default function MartabakPage() {
                           <label className="text-sm font-medium">Jumlah Cup</label>
                           <input
                             type="number"
-                            min="1"
+                            placeholder="0"
                             className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500/20 outline-none"
                             value={salesForm.cupCount}
                             onChange={e => {
-                              const cups = Math.max(1, Number(e.target.value))
-                              setSalesForm({ ...salesForm, cupCount: cups, martabakPcs: cups * 5 })
+                              const val = e.target.value
+                              if (val === '') {
+                                setSalesForm({ ...salesForm, cupCount: '', martabakPcs: '' })
+                              } else {
+                                const cups = Number(val)
+                                setSalesForm({ ...salesForm, cupCount: val, martabakPcs: cups * 5 })
+                              }
                             }}
                           />
                           <p className="text-xs text-gray-500">1 cup = 5 martabak</p>
@@ -487,12 +506,17 @@ export default function MartabakPage() {
                           <label className="text-sm font-medium">Jumlah Martabak (Pcs)</label>
                           <input
                             type="number"
-                            min="1"
+                            placeholder="0"
                             className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500/20 outline-none"
                             value={salesForm.martabakPcs}
                             onChange={e => {
-                              const pcs = Math.max(1, Number(e.target.value))
-                              setSalesForm({ ...salesForm, martabakPcs: pcs, cupCount: Math.ceil(pcs / 5) })
+                              const val = e.target.value
+                              if (val === '') {
+                                setSalesForm({ ...salesForm, martabakPcs: '', cupCount: '' })
+                              } else {
+                                const pcs = Number(val)
+                                setSalesForm({ ...salesForm, martabakPcs: val, cupCount: Math.ceil(pcs / 5) })
+                              }
                             }}
                           />
                           <p className="text-xs text-gray-500">Telur dibutuhkan: {Math.ceil(Number(salesForm.martabakPcs) / 5) || 0} butir (1 telur = 5 martabak)</p>
@@ -503,10 +527,10 @@ export default function MartabakPage() {
                           <label className="text-sm font-medium">Harga Per Pcs (Rp)</label>
                           <input
                             type="number"
-                            min="0"
+                            placeholder="0"
                             className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500/20 outline-none"
                             value={salesForm.pricePerPcs}
-                            onChange={e => setSalesForm({ ...salesForm, pricePerPcs: Math.max(0, Number(e.target.value)) })}
+                            onChange={e => setSalesForm({ ...salesForm, pricePerPcs: e.target.value })}
                           />
                         </div>
 
@@ -592,7 +616,7 @@ export default function MartabakPage() {
                     <CardTitle>Stok Bahan Baku</CardTitle>
                     <CardDescription>Pencatatan belanja bahan operasional (Tepung, Minyak, dll)</CardDescription>
                   </div>
-                  <Button onClick={() => { setShowAddIngredient(true); setEditingIngredientId(null); setIngredientForm({ name: "", quantity: 0, unit: "kg", cost: 0, cabangId: user?.role === 'admin' ? selectedCabangId : "" }) }} className="w-full sm:w-auto">
+                  <Button onClick={() => { setShowAddIngredient(true); setEditingIngredientId(null); setIngredientForm({ name: "", quantity: "", unit: "kg", cost: "", cabangId: user?.role === 'admin' ? selectedCabangId : "" }) }} className="w-full sm:w-auto">
                     <Plus className="w-4 h-4 mr-2" /> Catat Belanja
                   </Button>
                 </CardHeader>
@@ -623,7 +647,7 @@ export default function MartabakPage() {
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Jumlah</label>
-                          <input type="number" className="w-full p-2 border rounded-md" value={ingredientForm.quantity} onChange={e => setIngredientForm({ ...ingredientForm, quantity: Number(e.target.value) })} />
+                          <input type="number" placeholder="0" className="w-full p-2 border rounded-md" value={ingredientForm.quantity} onChange={e => setIngredientForm({ ...ingredientForm, quantity: e.target.value })} />
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Satuan</label>
@@ -633,7 +657,7 @@ export default function MartabakPage() {
                         </div>
                         <div className="md:col-span-2 space-y-2">
                           <label className="text-sm font-medium">Total Biaya (Rp)</label>
-                          <input type="number" className="w-full p-2 border rounded-md" value={ingredientForm.cost} onChange={e => setIngredientForm({ ...ingredientForm, cost: Number(e.target.value) })} />
+                          <input type="number" placeholder="0" className="w-full p-2 border rounded-md" value={ingredientForm.cost} onChange={e => setIngredientForm({ ...ingredientForm, cost: e.target.value })} />
                         </div>
                       </div>
                       <Button onClick={handleSubmitIngredient} className="w-full mt-4">Simpan Data</Button>

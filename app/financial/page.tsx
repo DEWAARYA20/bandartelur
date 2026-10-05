@@ -480,10 +480,15 @@ export default function FinancialPage() {
 }
 
 function OperationalExpensesTab({ onAdd, onUpdate, onDelete, expenses, user, toast, onSuccess }: any) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    date: string;
+    category: string;
+    amount: number | string;
+    description: string;
+  }>({
     date: getCurrentDateWITA(),
     category: "Listrik",
-    amount: 0,
+    amount: "",
     description: "",
   })
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -494,7 +499,8 @@ function OperationalExpensesTab({ onAdd, onUpdate, onDelete, expenses, user, toa
       toast({ title: "Error", description: "User tidak ditemukan. Silakan login ulang.", variant: "destructive" })
       return
     }
-    if (form.amount <= 0) {
+    const amount = Number(form.amount) || 0
+    if (amount <= 0) {
       toast({ title: "Validasi Gagal", description: "Jumlah harus > 0", variant: "destructive" })
       return
     }
@@ -507,7 +513,7 @@ function OperationalExpensesTab({ onAdd, onUpdate, onDelete, expenses, user, toa
       success = await onUpdate(editingId, {
         date: dateISO,
         category: form.category,
-        amount: form.amount,
+        amount: amount,
         description: form.description,
       })
     } else {
@@ -516,7 +522,7 @@ function OperationalExpensesTab({ onAdd, onUpdate, onDelete, expenses, user, toa
         cabangId: user.cabangId || undefined,
         date: dateISO,
         category: form.category,
-        amount: form.amount,
+        amount: amount,
         description: form.description,
       })
     }
@@ -525,7 +531,7 @@ function OperationalExpensesTab({ onAdd, onUpdate, onDelete, expenses, user, toa
       // Show notification based on role
       const message = editingId ? "Pengeluaran berhasil diperbarui" : "Pengeluaran berhasil ditambahkan"
       const notificationMessage = user.role === 'admin'
-        ? `${message} - ${form.category}: Rp ${form.amount.toLocaleString('id-ID')}`
+        ? `${message} - ${form.category}: Rp ${amount.toLocaleString('id-ID')}`
         : message
 
       toast({
@@ -536,7 +542,7 @@ function OperationalExpensesTab({ onAdd, onUpdate, onDelete, expenses, user, toa
       setForm({
         date: getCurrentDateWITA(),
         category: "Listrik",
-        amount: 0,
+        amount: "",
         description: ""
       })
       setEditingId(null)
@@ -566,7 +572,7 @@ function OperationalExpensesTab({ onAdd, onUpdate, onDelete, expenses, user, toa
     setForm({
       date: getCurrentDateWITA(),
       category: "Listrik",
-      amount: 0,
+      amount: "",
       description: ""
     })
     setEditingId(null)
@@ -629,7 +635,7 @@ function OperationalExpensesTab({ onAdd, onUpdate, onDelete, expenses, user, toa
                   type="number"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                   value={form.amount || ""}
-                  onChange={e => setForm({ ...form, amount: Number(e.target.value) })}
+                  onChange={e => setForm({ ...form, amount: e.target.value === "" ? "" : e.target.value })}
                 />
               </div>
               <div className="space-y-2">
