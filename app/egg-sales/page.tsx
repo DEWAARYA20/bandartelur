@@ -485,12 +485,14 @@ export default function EggSalesPage() {
                     <CardTitle>Riwayat Stok Masuk</CardTitle>
                     <CardDescription>Pencatatan telur yang masuk dari supplier</CardDescription>
                   </div>
-                  <Button onClick={() => { setShowAddStok(true); setEditingStokId(null); setStokForm({ size: 'besar', rackCount: '', pricePerEgg: '' }) }} className="w-full sm:w-auto">
-                    <Plus className="w-4 h-4 mr-2" /> Tambah Stok
-                  </Button>
+                  {user?.role === 'admin' && (
+                    <Button onClick={() => { setShowAddStok(true); setEditingStokId(null); setStokForm({ size: 'besar', rackCount: '', pricePerEgg: '' }) }} className="w-full sm:w-auto">
+                      <Plus className="w-4 h-4 mr-2" /> Tambah Stok
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
-                  {showAddStok && (
+                  {showAddStok && user?.role === 'admin' && (
                     <div className="bg-gray-50 border rounded-xl p-6 mb-6 animate-in slide-in-from-top-2">
                       <div className="flex justify-between items-center mb-4">
                         <h4 className="font-semibold text-lg">{editingStokId ? 'Edit Stok' : 'Tambah Stok Baru'}</h4>
@@ -536,7 +538,9 @@ export default function EggSalesPage() {
                                   <th className="px-4 py-2 text-left text-gray-500 font-medium">Tanggal</th>
                                   <th className="px-4 py-2 text-right text-gray-500 font-medium">Jumlah (Butir)</th>
                                   <th className="px-4 py-2 text-right text-gray-500 font-medium">Rak</th>
-                                  <th className="px-4 py-2 text-center text-gray-500 font-medium">Aksi</th>
+                                  {user?.role === 'admin' && (
+                                    <th className="px-4 py-2 text-center text-gray-500 font-medium">Aksi</th>
+                                  )}
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-100">
@@ -547,16 +551,18 @@ export default function EggSalesPage() {
                                     </td>
                                     <td className="px-4 py-2 text-right">{item.totalEggs}</td>
                                     <td className="px-4 py-2 text-right text-gray-400">{item.rackCount}</td>
-                                    <td className="px-4 py-2 text-center">
-                                      <div className="flex justify-center gap-1">
-                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" onClick={() => handleEditStokClick(item)}><Edit className="w-4 h-4" /></Button>
-                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600" onClick={() => handleDeleteStokClick(item.id)}><Trash2 className="w-4 h-4" /></Button>
-                                      </div>
-                                    </td>
+                                    {user?.role === 'admin' && (
+                                      <td className="px-4 py-2 text-center">
+                                        <div className="flex justify-center gap-1">
+                                          <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" onClick={() => handleEditStokClick(item)}><Edit className="w-4 h-4" /></Button>
+                                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600" onClick={() => handleDeleteStokClick(item.id)}><Trash2 className="w-4 h-4" /></Button>
+                                        </div>
+                                      </td>
+                                    )}
                                   </tr>
                                 ))}
                                 {stocksBySize[size as keyof typeof stocksBySize].length === 0 && (
-                                  <tr><td colSpan={4} className="p-4 text-center text-gray-400 text-xs">Belum ada data stok {size}</td></tr>
+                                  <tr><td colSpan={user?.role === 'admin' ? 4 : 3} className="p-4 text-center text-gray-400 text-xs">Belum ada data stok {size}</td></tr>
                                 )}
                               </tbody>
                             </table>
