@@ -46,10 +46,12 @@ export default function EggSalesPage() {
   const [stokForm, setStokForm] = useState<{
     size: "kecil" | "sedang" | "besar";
     rackCount: number | string;
+    extraEggs: number | string;
     pricePerEgg: number | string;
   }>({
     size: "besar",
     rackCount: "",
+    extraEggs: "",
     pricePerEgg: "",
   })
 
@@ -146,9 +148,10 @@ export default function EggSalesPage() {
     try {
       console.log("Submitting stok...", stokForm)
       const rackCount = Number(stokForm.rackCount) || 0
+      const extraEggs = Number(stokForm.extraEggs) || 0
       const pricePerEgg = Number(stokForm.pricePerEgg) || 0
-      if (rackCount <= 0 || pricePerEgg <= 0) {
-        toast({ title: "Validasi Gagal", description: "Isi data dengan benar", variant: "destructive" })
+      if ((rackCount <= 0 && extraEggs <= 0) || pricePerEgg <= 0) {
+        toast({ title: "Validasi Gagal", description: "Isi jumlah rak atau butir tambahan dan harga dengan benar", variant: "destructive" })
         return
       }
       if (!user) {
@@ -156,13 +159,15 @@ export default function EggSalesPage() {
         return
       }
 
+      const totalEggs = (rackCount * 30) + extraEggs
+
       const payload = {
         userId: user.id,
         size: stokForm.size,
         rackCount: rackCount,
         eggsPerRack: 30,
         pricePerEgg: pricePerEgg,
-        totalEggs: rackCount * 30,
+        totalEggs: totalEggs,
         date: getCurrentDateTimeWITA(),
         cabangId: user.cabangId
       }
@@ -178,7 +183,7 @@ export default function EggSalesPage() {
       if (success) {
         console.log("Success!")
         toast({ title: "Berhasil", description: "Data stok tersimpan" })
-        setStokForm({ size: "besar", rackCount: "", pricePerEgg: "" })
+        setStokForm({ size: "besar", rackCount: "", extraEggs: "", pricePerEgg: "" })
         setShowAddStok(false)
         setEditingStokId(null)
         loadData()
@@ -196,6 +201,7 @@ export default function EggSalesPage() {
     setStokForm({
       size: stock.size,
       rackCount: stock.rackCount,
+      extraEggs: "",
       pricePerEgg: stock.pricePerEgg
     })
     setEditingStokId(stock.id)
@@ -498,7 +504,7 @@ export default function EggSalesPage() {
                         <h4 className="font-semibold text-lg">{editingStokId ? 'Edit Stok' : 'Tambah Stok Baru'}</h4>
                         <Button variant="ghost" size="sm" onClick={() => setShowAddStok(false)}><X className="w-4 h-4" /></Button>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Ukuran</label>
                           <select className="w-full p-2 border rounded-md" value={stokForm.size} onChange={e => setStokForm({ ...stokForm, size: e.target.value as any })}>
@@ -509,13 +515,22 @@ export default function EggSalesPage() {
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Jumlah Rak</label>
-                          <input type="number" placeholder="0" className="w-full p-2 border rounded-md" value={stokForm.rackCount} onChange={e => setStokForm({ ...stokForm, rackCount: e.target.value })} />
-                          <p className="text-xs text-gray-500">Estimasi: {(Number(stokForm.rackCount) || 0) * 30} butir</p>
+                          <input type="number" min="0" placeholder="0" className="w-full p-2 border rounded-md" value={stokForm.rackCount} onChange={e => setStokForm({ ...stokForm, rackCount: e.target.value })} />
+                          <p className="text-xs text-gray-500">{(Number(stokForm.rackCount) || 0) * 30} butir</p>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Butir Tambahan</label>
+                          <input type="number" min="0" max="29" placeholder="0" className="w-full p-2 border rounded-md" value={stokForm.extraEggs} onChange={e => setStokForm({ ...stokForm, extraEggs: e.target.value })} />
+                          <p className="text-xs text-gray-500">Butir di luar rak (0–29)</p>
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Harga Beli/Butir</label>
                           <input type="number" placeholder="0" className="w-full p-2 border rounded-md" value={stokForm.pricePerEgg} onChange={e => setStokForm({ ...stokForm, pricePerEgg: e.target.value })} />
                         </div>
+                      </div>
+                      <div className="mt-3 flex items-center gap-2 bg-orange-50 border border-orange-100 rounded-lg px-4 py-2 text-sm text-orange-700">
+                        <Egg className="w-4 h-4 shrink-0" />
+                        <span>Total: <strong>({Number(stokForm.rackCount) || 0} rak × 30) + {Number(stokForm.extraEggs) || 0} butir = <span className="text-base font-bold">{((Number(stokForm.rackCount) || 0) * 30) + (Number(stokForm.extraEggs) || 0)} butir</span></strong></span>
                       </div>
                       <Button onClick={handleSubmitStok} className="w-full mt-4">Simpan Data</Button>
                     </div>
