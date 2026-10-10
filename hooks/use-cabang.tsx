@@ -24,7 +24,7 @@ export function useCabang() {
 
     try {
       const { data, error } = await supabase
-        .from("cabang")
+        .from("cabangs")
         .select("*")
         .order("name", { ascending: true })
 
@@ -66,7 +66,7 @@ export function useCabang() {
 
     try {
       const { data, error } = await supabase
-        .from("cabang")
+        .from("cabangs")
         .insert({
           name,
           description: description || null,
@@ -98,7 +98,7 @@ export function useCabang() {
 
     try {
       const { error } = await supabase
-        .from("cabang")
+        .from("cabangs")
         .update({
           name,
           description: description || null,
@@ -128,7 +128,7 @@ export function useCabang() {
     if (!supabase) return false
 
     try {
-      const { error } = await supabase.from("cabang").delete().eq("id", id)
+      const { error } = await supabase.from("cabangs").delete().eq("id", id)
 
       if (error) {
         console.error("[v0] Error deleting cabang:", error)
