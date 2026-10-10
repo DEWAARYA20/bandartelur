@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import { useEggStocks, useEggSales, useEggWaste, useMartabakSales } from "@/hooks/use-data"
@@ -59,14 +59,21 @@ export default function EggSalesPage() {
     cabangId: "",
   })
 
+  const [saleUnit, setSaleUnit] = useState<"butir" | "rak">("butir")
   const [salesForm, setSalesForm] = useState<{
     size: "kecil" | "sedang" | "besar";
     quantity: number | string;
     pricePerEgg: number | string;
+    rackCount: number | string;
+    pricePerRack: number | string;
+    extraEggs: number | string;
   }>({
     size: "besar",
     quantity: "",
     pricePerEgg: "",
+    rackCount: "",
+    pricePerRack: "",
+    extraEggs: "",
   })
 
   const [wasteForm, setWasteForm] = useState<{
@@ -146,6 +153,29 @@ export default function EggSalesPage() {
   const totalWasteEggs = eggWaste.reduce((sum, w) => sum + w.quantity, 0)
   const totalMartabakUsage = martabakSales.reduce((sum, m) => sum + (m.eggsUsed * m.quantity), 0) // Calculate usage
   const currentStock = totalStockEggs - totalSoldEggs - totalWasteEggs - totalMartabakUsage
+
+  // Kalkulasi estimasi transaksi penjualan
+  const calculatedSaleEggs = useMemo(() => {
+    if (saleUnit === 'rak') {
+      const racks = Number(salesForm.rackCount) || 0
+      const extra = Number(salesForm.extraEggs) || 0
+      return (racks * 30) + extra
+    }
+    return Number(salesForm.quantity) || 0
+  }, [saleUnit, salesForm.rackCount, salesForm.extraEggs, salesForm.quantity])
+
+  const calculatedSaleTotal = useMemo(() => {
+    if (saleUnit === 'rak') {
+      const racks = Number(salesForm.rackCount) || 0
+      const rackPrice = Number(salesForm.pricePerRack) || 0
+      const extra = Number(salesForm.extraEggs) || 0
+      const eggPrice = Number(salesForm.pricePerEgg) || (rackPrice > 0 ? Math.round(rackPrice / 30) : 0)
+      return (racks * rackPrice) + (extra * eggPrice)
+    }
+    const qty = Number(salesForm.quantity) || 0
+    const price = Number(salesForm.pricePerEgg) || 0
+    return qty * price
+  }, [saleUnit, salesForm.rackCount, salesForm.pricePerRack, salesForm.extraEggs, salesForm.pricePerEgg, salesForm.quantity])
 
   // --- Handlers Stok ---
 
@@ -234,12 +264,38 @@ export default function EggSalesPage() {
   // --- Handlers Sales ---
 
   const handleSubmitSales = async () => {
-    const qty = Number(salesForm.quantity) || 0
-    const price = Number(salesForm.pricePerEgg) || 0
-    if (qty <= 0 || price <= 0) {
-      toast({ title: "Validasi Gagal", description: "Isi data dengan benar", variant: "destructive" })
-      return
+    let qty = 0
+    let price = 0
+    let totalPrice = 0
+
+    if (saleUnit === 'rak') {
+      const racks = Number(salesForm.rackCount) || 0
+      const rackPrice = Number(salesForm.pricePerRack) || 0
+      const extra = Number(salesForm.extraEggs) || 0
+      const eggPrice = Number(salesForm.pricePerEgg) || (rackPrice > 0 ? Math.round(rackPrice / 30) : 0)
+
+      if (racks <= 0 && extra <= 0) {
+        toast({ title: "Validasi Gagal", description: "Masukkan jumlah rak atau butir yang valid", variant: "destructive" })
+        return
+      }
+      if (rackPrice <= 0 && (extra === 0 || eggPrice <= 0)) {
+        toast({ title: "Validasi Gagal", description: "Masukkan harga per rak dengan benar", variant: "destructive" })
+        return
+      }
+
+      qty = (racks * 30) + extra
+      totalPrice = (racks * rackPrice) + (extra * eggPrice)
+      price = qty > 0 ? Math.round(totalPrice / qty) : 0
+    } else {
+      qty = Number(salesForm.quantity) || 0
+      price = Number(salesForm.pricePerEgg) || 0
+      if (qty <= 0 || price <= 0) {
+        toast({ title: "Validasi Gagal", description: "Isi jumlah butir dan harga dengan benar", variant: "destructive" })
+        return
+      }
+      totalPrice = qty * price
     }
+
     if (!user) return
 
     const payload = {
@@ -247,7 +303,7 @@ export default function EggSalesPage() {
       size: salesForm.size,
       quantity: qty,
       pricePerEgg: price,
-      totalPrice: qty * price,
+      totalPrice: totalPrice,
       date: new Date().toISOString(),
       cabangId: user.cabangId
     }
@@ -261,7 +317,7 @@ export default function EggSalesPage() {
 
     if (success) {
       toast({ title: "Berhasil", description: "Data penjualan tersimpan" })
-      setSalesForm({ size: "besar", quantity: "", pricePerEgg: "" })
+      setSalesForm({ size: "besar", quantity: "", pricePerEgg: "", rackCount: "", pricePerRack: "", extraEggs: "" })
       setShowAddSales(false)
       setEditingSaleId(null)
       loadData()
@@ -271,11 +327,29 @@ export default function EggSalesPage() {
   }
 
   const handleEditSaleClick = (sale: any) => {
-    setSalesForm({
-      size: sale.size,
-      quantity: sale.quantity,
-      pricePerEgg: sale.pricePerEgg
-    })
+    const isRack = sale.quantity >= 30 && sale.quantity % 30 === 0
+    if (isRack) {
+      const racks = sale.quantity / 30
+      setSaleUnit("rak")
+      setSalesForm({
+        size: sale.size,
+        quantity: sale.quantity,
+        pricePerEgg: sale.pricePerEgg || "",
+        rackCount: racks,
+        pricePerRack: Math.round(sale.totalPrice / racks),
+        extraEggs: 0,
+      })
+    } else {
+      setSaleUnit("butir")
+      setSalesForm({
+        size: sale.size,
+        quantity: sale.quantity,
+        pricePerEgg: sale.pricePerEgg,
+        rackCount: "",
+        pricePerRack: "",
+        extraEggs: "",
+      })
+    }
     setEditingSaleId(sale.id)
     setShowAddSales(true)
   }
@@ -423,7 +497,7 @@ export default function EggSalesPage() {
                   <Plus className="w-4 h-4 mr-2" /> Stok Masuk
                 </Button>
               )}
-              <Button onClick={() => { setShowAddSales(true); setEditingSaleId(null); setSalesForm({ size: 'besar', quantity: 0, pricePerEgg: 2000 }) }} variant="secondary" className="bg-white shadow-sm btn-press">
+              <Button onClick={() => { setShowAddSales(true); setEditingSaleId(null); setSalesForm({ size: 'besar', quantity: '', pricePerEgg: '', rackCount: '', pricePerRack: '', extraEggs: '' }); setSaleUnit('butir') }} variant="secondary" className="bg-white shadow-sm btn-press">
                 <ShoppingCart className="w-4 h-4 mr-2" /> Jual Telur
               </Button>
             </div>
@@ -640,7 +714,7 @@ export default function EggSalesPage() {
                     <CardTitle>Riwayat Transaksi</CardTitle>
                     <CardDescription>Catatan penjualan harian</CardDescription>
                   </div>
-                  <Button onClick={() => { setShowAddSales(true); setEditingSaleId(null); setSalesForm({ size: 'besar', quantity: '', pricePerEgg: '' }) }} className="w-full sm:w-auto">
+                  <Button onClick={() => { setShowAddSales(true); setEditingSaleId(null); setSalesForm({ size: 'besar', quantity: '', pricePerEgg: '', rackCount: '', pricePerRack: '', extraEggs: '' }); setSaleUnit('butir') }} className="w-full sm:w-auto">
                     <Plus className="w-4 h-4 mr-2" /> Input Penjualan
                   </Button>
                 </CardHeader>
@@ -651,28 +725,100 @@ export default function EggSalesPage() {
                         <h4 className="font-semibold text-lg">{editingSaleId ? 'Edit Penjualan' : 'Input Penjualan Baru'}</h4>
                         <Button variant="ghost" size="sm" onClick={() => setShowAddSales(false)}><X className="w-4 h-4" /></Button>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Ukuran</label>
-                          <select className="w-full p-2 border rounded-md" value={salesForm.size} onChange={e => setSalesForm({ ...salesForm, size: e.target.value as any })}>
-                            <option value="kecil">Kecil</option>
-                            <option value="sedang">Sedang</option>
-                            <option value="besar">Besar</option>
-                          </select>
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Jumlah (Butir)</label>
-                          <input type="number" placeholder="0" className="w-full p-2 border rounded-md" value={salesForm.quantity} onChange={e => setSalesForm({ ...salesForm, quantity: e.target.value })} />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Harga Jual/Butir</label>
-                          <input type="number" placeholder="0" className="w-full p-2 border rounded-md" value={salesForm.pricePerEgg} onChange={e => setSalesForm({ ...salesForm, pricePerEgg: e.target.value })} />
+
+                      {/* Pilihan Satuan Jual: Per Butir vs Per Rak */}
+                      <div className="mb-5">
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">Satuan Penjualan</label>
+                        <div className="grid grid-cols-2 gap-2 p-1 bg-gray-200/60 rounded-xl max-w-md">
+                          <button
+                            type="button"
+                            onClick={() => setSaleUnit("butir")}
+                            className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
+                              saleUnit === "butir"
+                                ? "bg-white text-orange-600 shadow-sm"
+                                : "text-gray-600 hover:text-gray-900"
+                            }`}
+                          >
+                            <Egg className="w-4 h-4" />
+                            <span>Per Butir (Eceran)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSaleUnit("rak")}
+                            className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
+                              saleUnit === "rak"
+                                ? "bg-white text-orange-600 shadow-sm"
+                                : "text-gray-600 hover:text-gray-900"
+                            }`}
+                          >
+                            <Archive className="w-4 h-4" />
+                            <span>Per Rak (30 Butir)</span>
+                          </button>
                         </div>
                       </div>
-                      <div className="mt-4 flex justify-between items-center bg-white p-3 rounded-lg border">
-                        <span className="text-sm text-gray-500">Total Transaksi</span>
-                        <span className="font-bold text-lg text-green-600">Rp {((Number(salesForm.quantity) || 0) * (Number(salesForm.pricePerEgg) || 0)).toLocaleString('id-ID')}</span>
+
+                      {/* Form Field Berdasarkan Satuan */}
+                      {saleUnit === 'butir' ? (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Ukuran</label>
+                            <select className="w-full p-2 border rounded-md" value={salesForm.size} onChange={e => setSalesForm({ ...salesForm, size: e.target.value as any })}>
+                              <option value="kecil">Kecil</option>
+                              <option value="sedang">Sedang</option>
+                              <option value="besar">Besar</option>
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Jumlah (Butir)</label>
+                            <input type="number" min="1" placeholder="Contoh: 6" className="w-full p-2 border rounded-md" value={salesForm.quantity} onChange={e => setSalesForm({ ...salesForm, quantity: e.target.value })} />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Harga Jual / Butir (Rp)</label>
+                            <input type="number" min="0" placeholder="Contoh: 2000" className="w-full p-2 border rounded-md" value={salesForm.pricePerEgg} onChange={e => setSalesForm({ ...salesForm, pricePerEgg: e.target.value })} />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Ukuran</label>
+                            <select className="w-full p-2 border rounded-md" value={salesForm.size} onChange={e => setSalesForm({ ...salesForm, size: e.target.value as any })}>
+                              <option value="kecil">Kecil</option>
+                              <option value="sedang">Sedang</option>
+                              <option value="besar">Besar</option>
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Jumlah Rak</label>
+                            <input type="number" min="1" placeholder="Contoh: 1" className="w-full p-2 border rounded-md" value={salesForm.rackCount} onChange={e => setSalesForm({ ...salesForm, rackCount: e.target.value })} />
+                            <p className="text-xs text-gray-500">= {(Number(salesForm.rackCount) || 0) * 30} butir</p>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Harga Jual / Rak (Rp)</label>
+                            <input type="number" min="0" placeholder="Contoh: 55000" className="w-full p-2 border rounded-md" value={salesForm.pricePerRack} onChange={e => setSalesForm({ ...salesForm, pricePerRack: e.target.value })} />
+                            <p className="text-xs text-gray-500">
+                              {Number(salesForm.pricePerRack) > 0 ? `(~Rp ${Math.round(Number(salesForm.pricePerRack) / 30).toLocaleString('id-ID')}/butir)` : ''}
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-600">Butir Tambahan <span className="text-xs text-gray-400">(opsional)</span></label>
+                            <input type="number" min="0" max="29" placeholder="0" className="w-full p-2 border rounded-md" value={salesForm.extraEggs} onChange={e => setSalesForm({ ...salesForm, extraEggs: e.target.value })} />
+                            <p className="text-xs text-gray-500">Jika ada tambahan eceran</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Ringkasan Perhitungan Transaksi */}
+                      <div className="mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-3 rounded-lg border gap-2">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Archive className="w-4 h-4 text-orange-500" />
+                          <span>Total Telur Terjual: <strong>{calculatedSaleEggs} butir</strong> {saleUnit === 'rak' && `(${Number(salesForm.rackCount) || 0} rak${Number(salesForm.extraEggs) > 0 ? ` + ${salesForm.extraEggs} butir` : ''})`}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-gray-500">Total Transaksi</span>
+                          <span className="font-bold text-xl text-green-600">Rp {calculatedSaleTotal.toLocaleString('id-ID')}</span>
+                        </div>
                       </div>
+
                       <Button onClick={handleSubmitSales} className="w-full mt-4">Simpan Transaksi</Button>
                     </div>
                   )}
@@ -703,7 +849,14 @@ export default function EggSalesPage() {
                                     <td className="px-4 py-2 font-medium">
                                       {formatDateTimeWITA(item.date, item.createdAt)}
                                     </td>
-                                    <td className="px-4 py-2 text-right">{item.quantity}</td>
+                                    <td className="px-4 py-2 text-right">
+                                      <span className="font-semibold text-gray-900">{item.quantity} butir</span>
+                                      {item.quantity >= 30 && (
+                                        <span className="block text-xs text-orange-600 font-medium">
+                                          {Math.floor(item.quantity / 30)} rak{item.quantity % 30 > 0 ? ` + ${item.quantity % 30} btr` : ''}
+                                        </span>
+                                      )}
+                                    </td>
                                     <td className="px-4 py-2 text-right font-bold text-gray-900">{(item.totalPrice || 0).toLocaleString('id-ID')}</td>
                                     <td className="px-4 py-2 text-center">
                                       <div className="flex justify-center gap-1">
