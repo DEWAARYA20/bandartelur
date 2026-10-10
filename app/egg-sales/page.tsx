@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import { useEggStocks, useEggSales, useEggWaste, useMartabakSales } from "@/hooks/use-data"
+import { useCabang } from "@/hooks/use-cabang"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Sidebar } from "@/components/sidebar"
@@ -23,6 +24,7 @@ export default function EggSalesPage() {
   const { eggSales, loadEggSales, addEggSale, updateEggSale, deleteEggSale } = useEggSales()
   const { eggWaste, loadEggWaste, addEggWaste, deleteEggWaste } = useEggWaste()
   const { martabakSales, loadMartabakSales } = useMartabakSales()
+  const { cabangs } = useCabang()
 
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState<"stok" | "penjualan" | "rusak">("stok")
@@ -46,13 +48,15 @@ export default function EggSalesPage() {
   const [stokForm, setStokForm] = useState<{
     size: "kecil" | "sedang" | "besar";
     rackCount: number | string;
-    extraEggs: number | string;
+    extraEggs?: number | string;
     pricePerEgg: number | string;
+    cabangId?: string;
   }>({
     size: "besar",
     rackCount: "",
     extraEggs: "",
     pricePerEgg: "",
+    cabangId: "",
   })
 
   const [salesForm, setSalesForm] = useState<{
@@ -137,6 +141,7 @@ export default function EggSalesPage() {
   }
 
   const totalStockEggs = eggStocks.reduce((sum, s) => sum + s.totalEggs, 0)
+  const totalStockRacks = eggStocks.reduce((sum, s) => sum + (Number(s.rackCount) || 0), 0)
   const totalSoldEggs = eggSales.reduce((sum, s) => sum + s.quantity, 0)
   const totalWasteEggs = eggWaste.reduce((sum, w) => sum + w.quantity, 0)
   const totalMartabakUsage = martabakSales.reduce((sum, m) => sum + (m.eggsUsed * m.quantity), 0) // Calculate usage
@@ -158,8 +163,15 @@ export default function EggSalesPage() {
         console.error("User not found")
         return
       }
+      // Admin wajib pilih cabang
+      if (user.role === 'admin' && !stokForm.cabangId) {
+        toast({ title: "Validasi Gagal", description: "Pilih cabang tujuan stok", variant: "destructive" })
+        return
+      }
 
       const totalEggs = (rackCount * 30) + extraEggs
+      // Admin pakai cabang yang dipilih di form, karyawan pakai cabang sendiri
+      const targetCabangId = user.role === 'admin' ? stokForm.cabangId : user.cabangId
 
       const payload = {
         userId: user.id,
@@ -169,7 +181,7 @@ export default function EggSalesPage() {
         pricePerEgg: pricePerEgg,
         totalEggs: totalEggs,
         date: getCurrentDateTimeWITA(),
-        cabangId: user.cabangId
+        cabangId: targetCabangId
       }
 
       console.log("Payload:", payload)
@@ -183,7 +195,7 @@ export default function EggSalesPage() {
       if (success) {
         console.log("Success!")
         toast({ title: "Berhasil", description: "Data stok tersimpan" })
-        setStokForm({ size: "besar", rackCount: "", extraEggs: "", pricePerEgg: "" })
+        setStokForm({ size: "besar", rackCount: "", extraEggs: "", pricePerEgg: "", cabangId: "" })
         setShowAddStok(false)
         setEditingStokId(null)
         loadData()
@@ -198,11 +210,14 @@ export default function EggSalesPage() {
   }
 
   const handleEditStokClick = (stock: any) => {
+    const racks = Number(stock.rackCount) || 0
+    const extra = stock.totalEggs ? Math.max(0, stock.totalEggs - (racks * 30)) : ""
     setStokForm({
       size: stock.size,
       rackCount: stock.rackCount,
-      extraEggs: "",
-      pricePerEgg: stock.pricePerEgg
+      extraEggs: extra,
+      pricePerEgg: stock.pricePerEgg,
+      cabangId: stock.cabangId || ""
     })
     setEditingStokId(stock.id)
     setShowAddStok(true)
@@ -403,9 +418,11 @@ export default function EggSalesPage() {
               </p>
             </div>
             <div className="flex gap-2 flex-wrap">
-              <Button onClick={() => { setShowAddStok(true); setEditingStokId(null); setStokForm({ size: 'besar', rackCount: 1, pricePerEgg: 2000 }) }} className="gradient-primary shadow-lg shadow-orange-500/20 btn-press">
-                <Plus className="w-4 h-4 mr-2" /> Stok Masuk
-              </Button>
+              {user?.role === 'admin' && (
+                <Button onClick={() => { setShowAddStok(true); setEditingStokId(null); setStokForm({ size: 'besar', rackCount: 1, extraEggs: '', pricePerEgg: 2000, cabangId: '' }) }} className="gradient-primary shadow-lg shadow-orange-500/20 btn-press">
+                  <Plus className="w-4 h-4 mr-2" /> Stok Masuk
+                </Button>
+              )}
               <Button onClick={() => { setShowAddSales(true); setEditingSaleId(null); setSalesForm({ size: 'besar', quantity: 0, pricePerEgg: 2000 }) }} variant="secondary" className="bg-white shadow-sm btn-press">
                 <ShoppingCart className="w-4 h-4 mr-2" /> Jual Telur
               </Button>
@@ -448,7 +465,7 @@ export default function EggSalesPage() {
             <StatCard
               title="Total Stok Masuk"
               value={totalStockEggs.toLocaleString('id-ID')}
-              subValue="butir"
+              subValue={`butir • ${totalStockRacks} rak`}
               icon={Archive}
               colorClass="text-blue-600"
               gradient="gradient-blue"
@@ -492,7 +509,7 @@ export default function EggSalesPage() {
                     <CardDescription>Pencatatan telur yang masuk dari supplier</CardDescription>
                   </div>
                   {user?.role === 'admin' && (
-                    <Button onClick={() => { setShowAddStok(true); setEditingStokId(null); setStokForm({ size: 'besar', rackCount: '', pricePerEgg: '' }) }} className="w-full sm:w-auto">
+                    <Button onClick={() => { setShowAddStok(true); setEditingStokId(null); setStokForm({ size: 'besar', rackCount: '', extraEggs: '', pricePerEgg: '', cabangId: '' }) }} className="w-full sm:w-auto">
                       <Plus className="w-4 h-4 mr-2" /> Tambah Stok
                     </Button>
                   )}
@@ -528,6 +545,21 @@ export default function EggSalesPage() {
                           <input type="number" placeholder="0" className="w-full p-2 border rounded-md" value={stokForm.pricePerEgg} onChange={e => setStokForm({ ...stokForm, pricePerEgg: e.target.value })} />
                         </div>
                       </div>
+                      {/* Cabang selector — hanya untuk admin */}
+                      <div className="mt-3 space-y-2">
+                        <label className="text-sm font-medium">Cabang Tujuan <span className="text-red-500">*</span></label>
+                        <select
+                          className="w-full p-2 border rounded-md"
+                          value={stokForm.cabangId}
+                          onChange={e => setStokForm({ ...stokForm, cabangId: e.target.value })}
+                        >
+                          <option value="">-- Pilih Cabang --</option>
+                          {cabangs.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500">Stok akan muncul di halaman karyawan cabang ini</p>
+                      </div>
                       <div className="mt-3 flex items-center gap-2 bg-orange-50 border border-orange-100 rounded-lg px-4 py-2 text-sm text-orange-700">
                         <Egg className="w-4 h-4 shrink-0" />
                         <span>Total: <strong>({Number(stokForm.rackCount) || 0} rak × 30) + {Number(stokForm.extraEggs) || 0} butir = <span className="text-base font-bold">{((Number(stokForm.rackCount) || 0) * 30) + (Number(stokForm.extraEggs) || 0)} butir</span></strong></span>
@@ -551,6 +583,9 @@ export default function EggSalesPage() {
                               <thead className="bg-gray-50">
                                 <tr>
                                   <th className="px-4 py-2 text-left text-gray-500 font-medium">Tanggal</th>
+                                  {user?.role === 'admin' && (
+                                    <th className="px-4 py-2 text-left text-gray-500 font-medium">Cabang</th>
+                                  )}
                                   <th className="px-4 py-2 text-right text-gray-500 font-medium">Jumlah (Butir)</th>
                                   <th className="px-4 py-2 text-right text-gray-500 font-medium">Rak</th>
                                   {user?.role === 'admin' && (
@@ -564,6 +599,13 @@ export default function EggSalesPage() {
                                     <td className="px-4 py-2 font-medium">
                                       {formatDateTimeWITA(item.date, item.createdAt)}
                                     </td>
+                                    {user?.role === 'admin' && (
+                                      <td className="px-4 py-2 text-left text-xs">
+                                        <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md font-medium border border-gray-200">
+                                          {item.cabangName || 'Semua Cabang'}
+                                        </span>
+                                      </td>
+                                    )}
                                     <td className="px-4 py-2 text-right">{item.totalEggs}</td>
                                     <td className="px-4 py-2 text-right text-gray-400">{item.rackCount}</td>
                                     {user?.role === 'admin' && (
@@ -577,7 +619,7 @@ export default function EggSalesPage() {
                                   </tr>
                                 ))}
                                 {stocksBySize[size as keyof typeof stocksBySize].length === 0 && (
-                                  <tr><td colSpan={user?.role === 'admin' ? 4 : 3} className="p-4 text-center text-gray-400 text-xs">Belum ada data stok {size}</td></tr>
+                                  <tr><td colSpan={user?.role === 'admin' ? 5 : 3} className="p-4 text-center text-gray-400 text-xs">Belum ada data stok {size}</td></tr>
                                 )}
                               </tbody>
                             </table>
